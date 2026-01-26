@@ -1,0 +1,38 @@
+name: Update STH vs LTH Supply
+
+on:
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas
+
+      - name: Fetch STH vs LTH supply data
+        env:
+          BMP_API_KEY: ${{ secrets.BMP_API_KEY }}
+        run: python scripts/fetch_sth_lth_supply.py
+
+      - name: Commit data
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          mkdir -p data
+          git add data/sth-vs-lth-supply.json
+          git commit -m "Update sth vs lth supply data" || echo "No changes to commit"
+          git push
