@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>STH vs LTH Supply</title>
 
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 
@@ -28,6 +27,12 @@ function toNum(x){
   const n = Number(x);
   return Number.isFinite(n) ? n : null;
 }
+function pick(obj, keys){
+  for (const k of keys){
+    if (obj && Object.prototype.hasOwnProperty.call(obj, k)) return obj[k];
+  }
+  return undefined;
+}
 
 async function loadChart(){
   try{
@@ -37,118 +42,120 @@ async function loadChart(){
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) throw new Error("JSON is empty or not an array.");
 
+    // Adjust these keys if your JSON uses different names
+    const dateKeys = ["date", "Date"];
+    const lthKeys  = ["lth", "LTH", "lth_supply", "LTH_supply", "lthSupply", "lth_supply_btc"];
+    const sthKeys  = ["sth", "STH", "sth_supply", "STH_supply", "sthSupply", "sth_supply_btc"];
+    const priceKeys= ["price", "Price", "btc_price", "btcPrice", "price_usd", "usd_price"];
+
     const dates = [];
-    const lth   = [];
-    const sth   = [];
+    const lth = [];
+    const sth = [];
     const price = [];
 
-    let lthCount = 0;
-    let sthCount = 0;
-    let priceCount = 0;
-
     for (const r of rows){
-      const d = r?.date;
-      const l = toNum(r?.lth);
-      const s = toNum(r?.sth);
-      const p = toNum(r?.price);
+      const d = pick(r, dateKeys);
+      const l = toNum(pick(r, lthKeys));
+      const s = toNum(pick(r, sthKeys));
+      const p = toNum(pick(r, priceKeys));
 
       if (!d) continue;
 
+      // allow nulls, but keep aligned arrays
       dates.push(String(d));
       lth.push(l);
       sth.push(s);
       price.push(p);
-
-      if (l !== null) lthCount++;
-      if (s !== null) sthCount++;
-      if (p !== null) priceCount++;
     }
 
     if (dates.length === 0) throw new Error("No valid datapoints after parsing.");
 
-    const traces = [];
-
-    if (lthCount > 0){
-      traces.push({
+    const traces = [
+      {
         x: dates,
         y: lth,
         type: "scatter",
         mode: "lines",
         name: "LTH Supply",
-        line: { width: 3, color: "#2e7d32" },
-        hovertemplate: "LTH: %{y:,.2f}M BTC<br>%{x}<extra></extra>"
-      });
-    }
-
-    if (sthCount > 0){
-      traces.push({
+        line: { width: 2.5, color: "#2e7d32" },
+        hovertemplate: "LTH: %{y:,.0f}<br>%{x}<extra></extra>",
+        xaxis: "x",
+        yaxis: "y"
+      },
+      {
         x: dates,
         y: sth,
         type: "scatter",
         mode: "lines",
         name: "STH Supply",
-        yaxis: "y3",
-        line: { width: 3, color: "#d32f2f" },
-        hovertemplate: "STH: %{y:,.2f}M BTC<br>%{x}<extra></extra>"
-      });
-    }
-
-    if (priceCount > 0){
-      traces.push({
+        line: { width: 2.5, color: "#d32f2f" },
+        hovertemplate: "STH: %{y:,.0f}<br>%{x}<extra></extra>",
+        xaxis: "x",
+        yaxis: "y"
+      },
+      {
         x: dates,
         y: price,
         type: "scatter",
         mode: "lines",
         name: "BTC Price",
-        yaxis: "y2",
-        line: { width: 2, color: "#111111" },
+        line: { width: 2.2, color: "#111111" },
         connectgaps: true,
-        hovertemplate: "BTC: $%{y:,.0f}<br>%{x}<extra></extra>"
-      });
-    }
+        hovertemplate: "BTC: $%{y:,.0f}<br>%{x}<extra></extra>",
+        xaxis: "x2",
+        yaxis: "y2"
+      }
+    ];
 
     const layout = {
+      grid: {
+        rows: 2,
+        columns: 1,
+        pattern: "independent",
+        roworder: "top to bottom"
+      },
+
+      // Top panel x axis (hide ticks so it feels like one shared axis)
       xaxis: {
-        title: "Date",
         type: "date",
+        showgrid: false,
+        showticklabels: false,
+        ticks: "",
+        zeroline: false
+      },
+
+      // Bottom panel x axis (the only visible x axis)
+      xaxis2: {
+        type: "date",
+        title: "Date",
         showgrid: false,
         tickfont: { color: "#111111" },
         titlefont: { color: "#111111" }
       },
 
+      // Top panel y axis (Supply)
       yaxis: {
-        title: "LTH Supply (millions of BTC)",
+        title: "Supply (BTC)",
         showgrid: true,
         gridcolor: "#eeeeee",
+        tickformat: ",",
         tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" },
-        tickformat: ","
+        titlefont: { color: "#111111" }
       },
 
+      // Bottom panel y axis (BTC price)
       yaxis2: {
         title: "BTC Price (USD)",
-        overlaying: "y",
-        side: "right",
-        position: 1.0,
+        showgrid: true,
+        gridcolor: "#eeeeee",
         type: "log",
         tickprefix: "$",
         tickformat: ",",
-        showgrid: false,
         tickfont: { color: "#111111" },
         titlefont: { color: "#111111" }
       },
 
-      yaxis3: {
-        title: "STH Supply (millions of BTC)",
-        overlaying: "y",
-        side: "right",
-        position: 0.92,
-        showgrid: false,
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" },
-        tickformat: ","
-      },
-
+      // Watermark (across whole figure)
       images: [
         {
           source: "assets/tbl-logo.png",
@@ -169,8 +176,8 @@ async function loadChart(){
         {
           xref: "paper",
           yref: "paper",
-          x: 0.04,
-          y: 0.94,
+          x: 0.02,
+          y: 0.98,
           xanchor: "left",
           yanchor: "top",
           text: "Charts by: @TheBitcoinLayer",
@@ -185,8 +192,9 @@ async function loadChart(){
 
       plot_bgcolor: "#ffffff",
       paper_bgcolor: "#ffffff",
-      margin: { l: 90, r: 140, t: 20, b: 60 },
-      legend: { orientation: "h", x: 0.02, y: 1.05 }
+      margin: { l: 80, r: 40, t: 20, b: 60 },
+
+      legend: { orientation: "h", x: 0.02, y: 1.06 }
     };
 
     Plotly.newPlot("chart", traces, layout, {
