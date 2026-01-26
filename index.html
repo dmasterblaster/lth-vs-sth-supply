@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STH vs LTH Supply</title>
 
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 
@@ -13,20 +14,36 @@
       background:#ffffff;
       color:#111;
     }
-    #chart{
+    #wrap{
       width:100vw;
       height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    #chartSupply{
+      flex: 1 1 60%;
+      min-height: 380px;
+    }
+    #chartPrice{
+      flex: 1 1 40%;
+      min-height: 260px;
+      border-top: 1px solid #eee;
     }
   </style>
 </head>
+
 <body>
-  <div id="chart"></div>
+  <div id="wrap">
+    <div id="chartSupply"></div>
+    <div id="chartPrice"></div>
+  </div>
 
 <script>
 function toNum(x){
   const n = Number(x);
   return Number.isFinite(n) ? n : null;
 }
+
 function pick(obj, keys){
   for (const k of keys){
     if (obj && Object.prototype.hasOwnProperty.call(obj, k)) return obj[k];
@@ -34,34 +51,34 @@ function pick(obj, keys){
   return undefined;
 }
 
-async function loadChart(){
+async function loadCharts(){
   try{
+    // ✅ change this filename to whatever you are writing from your Action script
     const res = await fetch("data/sth-vs-lth-supply.json", { cache: "no-store" });
     if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
 
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) throw new Error("JSON is empty or not an array.");
 
-    // Adjust these keys if your JSON uses different names
-    const dateKeys = ["date", "Date"];
-    const lthKeys  = ["lth", "LTH", "lth_supply", "LTH_supply", "lthSupply", "lth_supply_btc"];
-    const sthKeys  = ["sth", "STH", "sth_supply", "STH_supply", "sthSupply", "sth_supply_btc"];
-    const priceKeys= ["price", "Price", "btc_price", "btcPrice", "price_usd", "usd_price"];
+    // Flexible keys, so your JSON can be named differently
+    const dateKeys  = ["date","Date","time","Time","timestamp","Timestamp"];
+    const lthKeys   = ["lth","LTH","lth_supply","lthSupply","lthSupplyBtc","lth_supply_btc","LTHSupply","lth_supply_total"];
+    const sthKeys   = ["sth","STH","sth_supply","sthSupply","sthSupplyBtc","sth_supply_btc","STHSupply","sth_supply_total"];
+    const priceKeys = ["price","Price","btc_price","btcPrice","price_usd","usd_price","BTCPrice","btc_usd"];
 
     const dates = [];
-    const lth = [];
-    const sth = [];
+    const lth   = [];
+    const sth   = [];
     const price = [];
 
     for (const r of rows){
       const d = pick(r, dateKeys);
+      if (!d) continue;
+
       const l = toNum(pick(r, lthKeys));
       const s = toNum(pick(r, sthKeys));
       const p = toNum(pick(r, priceKeys));
 
-      if (!d) continue;
-
-      // allow nulls, but keep aligned arrays
       dates.push(String(d));
       lth.push(l);
       sth.push(s);
@@ -70,7 +87,35 @@ async function loadChart(){
 
     if (dates.length === 0) throw new Error("No valid datapoints after parsing.");
 
-    const traces = [
+    // 🔹 Filter to trailing 3 years
+    const latestDate = new Date(dates[dates.length - 1]);
+    const threeYearsAgo = new Date(latestDate);
+    threeYearsAgo.setFullYear(latestDate.getFullYear() - 3);
+
+    const f_dates = [];
+    const f_lth = [];
+    const f_sth = [];
+    const f_price = [];
+
+    for (let i = 0; i < dates.length; i++){
+      const d = new Date(dates[i]);
+      if (d >= threeYearsAgo){
+        f_dates.push(dates[i]);
+        f_lth.push(lth[i]);
+        f_sth.push(sth[i]);
+        f_price.push(price[i]);
+      }
+    }
+
+    // overwrite originals
+    dates.length = 0; lth.length = 0; sth.length = 0; price.length = 0;
+    dates.push(...f_dates);
+    lth.push(...f_lth);
+    sth.push(...f_sth);
+    price.push(...f_price);
+
+    // --- TOP: Supply chart (2 lines) ---
+    const supplyTraces = [
       {
         x: dates,
         y: lth,
@@ -78,9 +123,8 @@ async function loadChart(){
         mode: "lines",
         name: "LTH Supply",
         line: { width: 2.5, color: "#2e7d32" },
-        hovertemplate: "LTH: %{y:,.0f}<br>%{x}<extra></extra>",
-        xaxis: "x",
-        yaxis: "y"
+        connectgaps: true,
+        hovertemplate: "LTH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
       },
       {
         x: dates,
@@ -89,73 +133,29 @@ async function loadChart(){
         mode: "lines",
         name: "STH Supply",
         line: { width: 2.5, color: "#d32f2f" },
-        hovertemplate: "STH: %{y:,.0f}<br>%{x}<extra></extra>",
-        xaxis: "x",
-        yaxis: "y"
-      },
-      {
-        x: dates,
-        y: price,
-        type: "scatter",
-        mode: "lines",
-        name: "BTC Price",
-        line: { width: 2.2, color: "#111111" },
         connectgaps: true,
-        hovertemplate: "BTC: $%{y:,.0f}<br>%{x}<extra></extra>",
-        xaxis: "x2",
-        yaxis: "y2"
+        hovertemplate: "STH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
       }
     ];
 
-    const layout = {
-      grid: {
-        rows: 2,
-        columns: 1,
-        pattern: "independent",
-        roworder: "top to bottom"
-      },
-
-      // Top panel x axis (hide ticks so it feels like one shared axis)
+    const supplyLayout = {
       xaxis: {
-        type: "date",
-        showgrid: false,
-        showticklabels: false,
-        ticks: "",
-        zeroline: false
-      },
-
-      // Bottom panel x axis (the only visible x axis)
-      xaxis2: {
-        type: "date",
         title: "Date",
+        type: "date",
         showgrid: false,
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" }
+        tickfont: { color: "#111" },
+        titlefont: { color: "#111" }
       },
-
-      // Top panel y axis (Supply)
       yaxis: {
         title: "Supply (BTC)",
         showgrid: true,
         gridcolor: "#eeeeee",
-        tickformat: ",",
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" }
+        tickfont: { color: "#111" },
+        titlefont: { color: "#111" },
+        tickformat: ","
       },
 
-      // Bottom panel y axis (BTC price)
-      yaxis2: {
-        title: "BTC Price (USD)",
-        showgrid: true,
-        gridcolor: "#eeeeee",
-        type: "log",
-        tickprefix: "$",
-        tickformat: ",",
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" }
-      },
-
-      // Watermark (across whole figure)
+      // 🔹 CENTER WATERMARK (drop your logo file here)
       images: [
         {
           source: "assets/tbl-logo.png",
@@ -163,8 +163,8 @@ async function loadChart(){
           yref: "paper",
           x: 0.5,
           y: 0.5,
-          sizex: 0.6,
-          sizey: 0.6,
+          sizex: 0.7,
+          sizey: 0.7,
           xanchor: "center",
           yanchor: "middle",
           opacity: 0.06,
@@ -172,18 +172,19 @@ async function loadChart(){
         }
       ],
 
+      // 🔹 BRAND LABEL
       annotations: [
         {
           xref: "paper",
           yref: "paper",
           x: 0.02,
-          y: 0.98,
+          y: 0.96,
           xanchor: "left",
           yanchor: "top",
           text: "Charts by: @TheBitcoinLayer",
           showarrow: false,
           font: { size: 14, color: "#111" },
-          bgcolor: "rgba(255,255,255,0.7)",
+          bgcolor: "rgba(255,255,255,0.75)",
           bordercolor: "rgba(0,0,0,0.15)",
           borderwidth: 1,
           borderpad: 6
@@ -192,24 +193,65 @@ async function loadChart(){
 
       plot_bgcolor: "#ffffff",
       paper_bgcolor: "#ffffff",
-      margin: { l: 80, r: 40, t: 20, b: 60 },
-
-      legend: { orientation: "h", x: 0.02, y: 1.06 }
+      margin: { l: 80, r: 30, t: 20, b: 60 },
+      legend: { orientation: "h", x: 0.02, y: 1.05 }
     };
 
-    Plotly.newPlot("chart", traces, layout, {
+    Plotly.newPlot("chartSupply", supplyTraces, supplyLayout, {
+      responsive: true,
+      displaylogo: false
+    });
+
+    // --- BOTTOM: BTC Price chart (black, log scale optional) ---
+    const priceTrace = {
+      x: dates,
+      y: price,
+      type: "scatter",
+      mode: "lines",
+      name: "BTC Price",
+      line: { width: 2.2, color: "#111111" },
+      connectgaps: true,
+      hovertemplate: "BTC: $%{y:,.0f}<br>%{x}<extra></extra>"
+    };
+
+    const priceLayout = {
+      xaxis: {
+        title: "Date",
+        type: "date",
+        showgrid: false,
+        tickfont: { color: "#111" },
+        titlefont: { color: "#111" }
+      },
+      yaxis: {
+        title: "BTC Price (USD)",
+        // change to "linear" if you want
+        type: "log",
+        showgrid: true,
+        gridcolor: "#eeeeee",
+        tickprefix: "$",
+        tickformat: ",",
+        tickfont: { color: "#111" },
+        titlefont: { color: "#111" }
+      },
+      plot_bgcolor: "#ffffff",
+      paper_bgcolor: "#ffffff",
+      margin: { l: 80, r: 30, t: 20, b: 60 },
+      legend: { orientation: "h", x: 0.02, y: 1.05 }
+    };
+
+    Plotly.newPlot("chartPrice", [priceTrace], priceLayout, {
       responsive: true,
       displaylogo: false
     });
 
   } catch (err){
     console.error(err);
-    document.getElementById("chart").innerHTML =
+    document.getElementById("wrap").innerHTML =
       "<p style='color:#cf222e;padding:20px;'>Error loading chart data. Open DevTools Console for details.</p>";
   }
 }
 
-loadChart();
+loadCharts();
 </script>
 </body>
 </html>
