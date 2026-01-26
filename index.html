@@ -53,66 +53,55 @@ function pick(obj, keys){
 
 async function loadCharts(){
   try{
-    // ✅ change this filename to whatever you are writing from your Action script
     const res = await fetch("data/sth-vs-lth-supply.json", { cache: "no-store" });
     if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
 
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) throw new Error("JSON is empty or not an array.");
 
-    // Flexible keys, so your JSON can be named differently
     const dateKeys  = ["date","Date","time","Time","timestamp","Timestamp"];
     const lthKeys   = ["lth","LTH","lth_supply","lthSupply","lthSupplyBtc","lth_supply_btc","LTHSupply","lth_supply_total"];
     const sthKeys   = ["sth","STH","sth_supply","sthSupply","sthSupplyBtc","sth_supply_btc","STHSupply","sth_supply_total"];
     const priceKeys = ["price","Price","btc_price","btcPrice","price_usd","usd_price","BTCPrice","btc_usd"];
 
-    const dates = [];
-    const lth   = [];
-    const sth   = [];
-    const price = [];
+    // Build a typed array first, then sort + filter
+    const pts = [];
 
     for (const r of rows){
-      const d = pick(r, dateKeys);
-      if (!d) continue;
+      const dRaw = pick(r, dateKeys);
+      if (!dRaw) continue;
 
-      const l = toNum(pick(r, lthKeys));
-      const s = toNum(pick(r, sthKeys));
-      const p = toNum(pick(r, priceKeys));
+      const d = new Date(String(dRaw));
+      if (Number.isNaN(d.getTime())) continue;
 
-      dates.push(String(d));
-      lth.push(l);
-      sth.push(s);
-      price.push(p);
+      pts.push({
+        dateStr: String(dRaw),
+        dateObj: d,
+        lth: toNum(pick(r, lthKeys)),
+        sth: toNum(pick(r, sthKeys)),
+        price: toNum(pick(r, priceKeys))
+      });
     }
 
-    if (dates.length === 0) throw new Error("No valid datapoints after parsing.");
+    if (pts.length === 0) throw new Error("No valid datapoints after parsing.");
 
-    // 🔹 Filter to trailing 3 years
-    const latestDate = new Date(dates[dates.length - 1]);
-    const threeYearsAgo = new Date(latestDate);
-    threeYearsAgo.setFullYear(latestDate.getFullYear() - 3);
+    // ✅ Sort ascending by actual date
+    pts.sort((a,b) => a.dateObj - b.dateObj);
 
-    const f_dates = [];
-    const f_lth = [];
-    const f_sth = [];
-    const f_price = [];
+    // ✅ Find true latest date (max)
+    const latest = pts[pts.length - 1].dateObj;
 
-    for (let i = 0; i < dates.length; i++){
-      const d = new Date(dates[i]);
-      if (d >= threeYearsAgo){
-        f_dates.push(dates[i]);
-        f_lth.push(lth[i]);
-        f_sth.push(sth[i]);
-        f_price.push(price[i]);
-      }
-    }
+    // ✅ Compute cutoff (3 years back from latest)
+    const cutoff = new Date(latest);
+    cutoff.setFullYear(latest.getFullYear() - 3);
 
-    // overwrite originals
-    dates.length = 0; lth.length = 0; sth.length = 0; price.length = 0;
-    dates.push(...f_dates);
-    lth.push(...f_lth);
-    sth.push(...f_sth);
-    price.push(...f_price);
+    // ✅ Filter to trailing 3 years
+    const filtered = pts.filter(p => p.dateObj >= cutoff);
+
+    const dates = filtered.map(p => p.dateStr);
+    const lth   = filtered.map(p => p.lth);
+    const sth   = filtered.map(p => p.sth);
+    const price = filtered.map(p => p.price);
 
     // --- TOP: Supply chart (2 lines) ---
     const supplyTraces = [
@@ -155,7 +144,6 @@ async function loadCharts(){
         tickformat: ","
       },
 
-      // 🔹 CENTER WATERMARK (drop your logo file here)
       images: [
         {
           source: "assets/tbl-logo.png",
@@ -172,7 +160,6 @@ async function loadCharts(){
         }
       ],
 
-      // 🔹 BRAND LABEL
       annotations: [
         {
           xref: "paper",
@@ -202,7 +189,7 @@ async function loadCharts(){
       displaylogo: false
     });
 
-    // --- BOTTOM: BTC Price chart (black, log scale optional) ---
+    // --- BOTTOM: BTC Price chart ---
     const priceTrace = {
       x: dates,
       y: price,
@@ -224,7 +211,6 @@ async function loadCharts(){
       },
       yaxis: {
         title: "BTC Price (USD)",
-        // change to "linear" if you want
         type: "log",
         showgrid: true,
         gridcolor: "#eeeeee",
