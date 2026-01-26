@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STH vs LTH Supply</title>
+
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+
+  <style>
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:#ffffff;
+      color:#111;
+    }
+    #chart{
+      width:100vw;
+      height:100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart"></div>
+
+<script>
+function toNum(x){
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function loadChart(){
+  try{
+    const res = await fetch("data/sth-vs-lth-supply.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error("JSON is empty or not an array.");
+
+    const dates = [];
+    const lth   = [];
+    const sth   = [];
+    const price = [];
+
+    let lthCount = 0;
+    let sthCount = 0;
+    let priceCount = 0;
+
+    for (const r of rows){
+      const d = r?.date;
+      const l = toNum(r?.lth);
+      const s = toNum(r?.sth);
+      const p = toNum(r?.price);
+
+      if (!d) continue;
+
+      dates.push(String(d));
+      lth.push(l);
+      sth.push(s);
+      price.push(p);
+
+      if (l !== null) lthCount++;
+      if (s !== null) sthCount++;
+      if (p !== null) priceCount++;
+    }
+
+    if (dates.length === 0) throw new Error("No valid datapoints after parsing.");
+
+    const traces = [];
+
+    if (lthCount > 0){
+      traces.push({
+        x: dates,
+        y: lth,
+        type: "scatter",
+        mode: "lines",
+        name: "LTH Supply",
+        line: { width: 3, color: "#2e7d32" },
+        hovertemplate: "LTH: %{y:,.2f}M BTC<br>%{x}<extra></extra>"
+      });
+    }
+
+    if (sthCount > 0){
+      traces.push({
+        x: dates,
+        y: sth,
+        type: "scatter",
+        mode: "lines",
+        name: "STH Supply",
+        yaxis: "y3",
+        line: { width: 3, color: "#d32f2f" },
+        hovertemplate: "STH: %{y:,.2f}M BTC<br>%{x}<extra></extra>"
+      });
+    }
+
+    if (priceCount > 0){
+      traces.push({
+        x: dates,
+        y: price,
+        type: "scatter",
+        mode: "lines",
+        name: "BTC Price",
+        yaxis: "y2",
+        line: { width: 2, color: "#111111" },
+        connectgaps: true,
+        hovertemplate: "BTC: $%{y:,.0f}<br>%{x}<extra></extra>"
+      });
+    }
+
+    const layout = {
+      xaxis: {
+        title: "Date",
+        type: "date",
+        showgrid: false,
+        tickfont: { color: "#111111" },
+        titlefont: { color: "#111111" }
+      },
+
+      yaxis: {
+        title: "LTH Supply (millions of BTC)",
+        showgrid: true,
+        gridcolor: "#eeeeee",
+        tickfont: { color: "#111111" },
+        titlefont: { color: "#111111" },
+        tickformat: ","
+      },
+
+      yaxis2: {
+        title: "BTC Price (USD)",
+        overlaying: "y",
+        side: "right",
+        position: 1.0,
+        type: "log",
+        tickprefix: "$",
+        tickformat: ",",
+        showgrid: false,
+        tickfont: { color: "#111111" },
+        titlefont: { color: "#111111" }
+      },
+
+      yaxis3: {
+        title: "STH Supply (millions of BTC)",
+        overlaying: "y",
+        side: "right",
+        position: 0.92,
+        showgrid: false,
+        tickfont: { color: "#111111" },
+        titlefont: { color: "#111111" },
+        tickformat: ","
+      },
+
+      images: [
+        {
+          source: "assets/tbl-logo.png",
+          xref: "paper",
+          yref: "paper",
+          x: 0.5,
+          y: 0.5,
+          sizex: 0.6,
+          sizey: 0.6,
+          xanchor: "center",
+          yanchor: "middle",
+          opacity: 0.06,
+          layer: "below"
+        }
+      ],
+
+      annotations: [
+        {
+          xref: "paper",
+          yref: "paper",
+          x: 0.04,
+          y: 0.94,
+          xanchor: "left",
+          yanchor: "top",
+          text: "Charts by: @TheBitcoinLayer",
+          showarrow: false,
+          font: { size: 14, color: "#111" },
+          bgcolor: "rgba(255,255,255,0.7)",
+          bordercolor: "rgba(0,0,0,0.15)",
+          borderwidth: 1,
+          borderpad: 6
+        }
+      ],
+
+      plot_bgcolor: "#ffffff",
+      paper_bgcolor: "#ffffff",
+      margin: { l: 90, r: 140, t: 20, b: 60 },
+      legend: { orientation: "h", x: 0.02, y: 1.05 }
+    };
+
+    Plotly.newPlot("chart", traces, layout, {
+      responsive: true,
+      displaylogo: false
+    });
+
+  } catch (err){
+    console.error(err);
+    document.getElementById("chart").innerHTML =
+      "<p style='color:#cf222e;padding:20px;'>Error loading chart data. Open DevTools Console for details.</p>";
+  }
+}
+
+loadChart();
+</script>
+</body>
+</html>
