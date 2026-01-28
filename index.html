@@ -64,7 +64,6 @@ async function loadCharts(){
     const sthKeys   = ["sth","STH","sth_supply","sthSupply","sthSupplyBtc","sth_supply_btc","STHSupply","sth_supply_total"];
     const priceKeys = ["price","Price","btc_price","btcPrice","price_usd","usd_price","BTCPrice","btc_usd"];
 
-    // Build a typed array first, then sort + filter
     const pts = [];
 
     for (const r of rows){
@@ -85,17 +84,12 @@ async function loadCharts(){
 
     if (pts.length === 0) throw new Error("No valid datapoints after parsing.");
 
-    // ✅ Sort ascending by actual date
     pts.sort((a,b) => a.dateObj - b.dateObj);
 
-    // ✅ Find true latest date (max)
     const latest = pts[pts.length - 1].dateObj;
-
-    // ✅ Compute cutoff (3 years back from latest)
     const cutoff = new Date(latest);
     cutoff.setFullYear(latest.getFullYear() - 3);
 
-    // ✅ Filter to trailing 3 years
     const filtered = pts.filter(p => p.dateObj >= cutoff);
 
     const dates = filtered.map(p => p.dateStr);
@@ -103,11 +97,12 @@ async function loadCharts(){
     const sth   = filtered.map(p => p.sth);
     const price = filtered.map(p => p.price);
 
-    // --- TOP: Supply chart (2 lines) ---
+    /* -------- SUPPLY CHART -------- */
+
     const supplyTraces = [
       {
         x: dates,
-        y: lth,
+        y: sth,
         type: "scatter",
         mode: "lines",
         name: "STH Supply",
@@ -117,7 +112,7 @@ async function loadCharts(){
       },
       {
         x: dates,
-        y: sth,
+        y: lth,
         type: "scatter",
         mode: "lines",
         name: "LTH Supply",
@@ -131,16 +126,12 @@ async function loadCharts(){
       xaxis: {
         title: "Date",
         type: "date",
-        showgrid: false,
-        tickfont: { color: "#111" },
-        titlefont: { color: "#111" }
+        showgrid: false
       },
       yaxis: {
         title: "Supply (BTC)",
         showgrid: true,
         gridcolor: "#eeeeee",
-        tickfont: { color: "#111" },
-        titlefont: { color: "#111" },
         tickformat: ","
       },
 
@@ -166,11 +157,9 @@ async function loadCharts(){
           yref: "paper",
           x: 0.02,
           y: 0.96,
-          xanchor: "left",
-          yanchor: "top",
           text: "Charts by: @TheBitcoinLayer",
           showarrow: false,
-          font: { size: 14, color: "#111" },
+          font: { size: 14 },
           bgcolor: "rgba(255,255,255,0.75)",
           bordercolor: "rgba(0,0,0,0.15)",
           borderwidth: 1,
@@ -178,8 +167,6 @@ async function loadCharts(){
         }
       ],
 
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
       margin: { l: 80, r: 30, t: 20, b: 60 },
       legend: { orientation: "h", x: 0.02, y: 1.05 }
     };
@@ -189,7 +176,8 @@ async function loadCharts(){
       displaylogo: false
     });
 
-    // --- BOTTOM: BTC Price chart ---
+    /* -------- PRICE CHART -------- */
+
     const priceTrace = {
       x: dates,
       y: price,
@@ -205,9 +193,7 @@ async function loadCharts(){
       xaxis: {
         title: "Date",
         type: "date",
-        showgrid: false,
-        tickfont: { color: "#111" },
-        titlefont: { color: "#111" }
+        showgrid: false
       },
       yaxis: {
         title: "BTC Price (USD)",
@@ -215,14 +201,9 @@ async function loadCharts(){
         showgrid: true,
         gridcolor: "#eeeeee",
         tickprefix: "$",
-        tickformat: ",",
-        tickfont: { color: "#111" },
-        titlefont: { color: "#111" }
+        tickformat: ","
       },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
-      margin: { l: 80, r: 30, t: 20, b: 60 },
-      legend: { orientation: "h", x: 0.02, y: 1.05 }
+      margin: { l: 80, r: 30, t: 20, b: 60 }
     };
 
     Plotly.newPlot("chartPrice", [priceTrace], priceLayout, {
@@ -233,7 +214,7 @@ async function loadCharts(){
   } catch (err){
     console.error(err);
     document.getElementById("wrap").innerHTML =
-      "<p style='color:#cf222e;padding:20px;'>Error loading chart data. Open DevTools Console for details.</p>";
+      "<p style='color:#cf222e;padding:20px;'>Error loading chart data.</p>";
   }
 }
 
