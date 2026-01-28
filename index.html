@@ -100,27 +100,27 @@ async function loadCharts(){
     /* -------- SUPPLY CHART -------- */
 
     const supplyTraces = [
-      {
-        x: dates,
-        y: sth,
-        type: "scatter",
-        mode: "lines",
-        name: "LTH Supply",
-        line: { width: 2.5, color: "#2e7d32" },
-        connectgaps: true,
-        hovertemplate: "STH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
-      },
-      {
-        x: dates,
-        y: lth,
-        type: "scatter",
-        mode: "lines",
-        name: "STH Supply",
-        line: { width: 2.5, color: "#d32f2f" },
-        connectgaps: true,
-        hovertemplate: "LTH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
-      }
-    ];
+  {
+    x: dates,
+    y: lth,   // stays the same
+    type: "scatter",
+    mode: "lines",
+    name: "STH Supply",   // flipped title
+    line: { width: 2.5, color: "#2e7d32" },
+    connectgaps: true,
+    hovertemplate: "STH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
+  },
+  {
+    x: dates,
+    y: sth,   // stays the same
+    type: "scatter",
+    mode: "lines",
+    name: "LTH Supply",   // flipped title
+    line: { width: 2.5, color: "#d32f2f" },
+    connectgaps: true,
+    hovertemplate: "LTH: %{y:,.0f} BTC<br>%{x}<extra></extra>"
+  }
+];
 
     const supplyLayout = {
       xaxis: {
